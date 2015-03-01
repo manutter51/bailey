@@ -21,12 +21,40 @@
         (bar/docs (app/setup) :bailey.app/server-start)
         => "Fires after the server successfully starts. Intended for debugging/logging.")
 
-(m/fact "bailey.app/setup accepts either :jetty or :servlet, but not both"
-        (app/setup :jetty)
-        => (m/contains {:bailey.app/server-type :jetty})
+(m/fact "bailey.app/setup allows only valid jetty options"
+        (:bailey.app/server-options (app/setup :port 8080))
+        => (m/contains {:port 8080})
 
-        (app/setup :servlet)
-        => (m/contains {:bailey.app/server-type :servlet})
+        (:bailey.app/server-options (app/setup :port 8080 :join? true))
+        => (m/contains {:port 8080 :join? true} :in-any-order :gaps-ok)
 
-        (app/setup :jetty :servlet)
-        => (m/throws Exception "Server type must be either :jetty or :servlet, not both."))
+        (:bailey.app/server-options (app/setup :jetty :foo))
+        => (m/throws Exception "Unknown option(s): jetty"))
+
+(m/fact "bailey.app setup sets up a default server-restart handler"
+        (let [ctx (app/setup :port 8088)]
+          (bar/handler-keys ctx :bailey.app/server-restart)
+          => (m/contains [:bailey.app/default-restart-handler])))
+
+(m/fact "default restart handler fires the right events in the right order"
+        (try
+          (let [coll (atom [])
+                   mock (fn [key] (fn [ctx data] (swap! coll conj key) (bar/ok data)))
+                   ctx (app/setup :port 8089 :join? false)
+                   ctx (bar/add-handler ctx :bailey.app/server-stop :ss-handler (mock :ss))
+                   ctx (bar/add-handler ctx :bailey.app/stop :stop-handler (mock :stop))
+                   ctx (bar/add-handler ctx :bailey.app/load-config :load-handler (mock :load))
+                   ctx (bar/add-handler ctx :bailey.app/init :init-handler (mock :init))
+                   ctx (bar/add-handler ctx :bailey.app/server-start :start-handler (mock :start))
+                   ctx (app/start-server ctx)
+                   _ (reset! coll [])
+                   result (bar/fire ctx :bailey.app/server-restart)
+                   results-vec @coll
+                   ctx (app/stop-server* ctx)]
+
+               (:status result)
+               => :ok
+
+               results-vec
+               => (m/exactly [:ss :stop :load :init :start]))
+          (catch Exception e (app/stop-server* {}))))
