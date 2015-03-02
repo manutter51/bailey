@@ -1,16 +1,25 @@
 (ns bailey.app
   (require [barnum.api :as bar]
            [ring.adapter.jetty :as jetty]
-           [bailey.req :as req]
+           [bailey.request :as req]
            [bailey.dispatch :as disp]
            [bailey.render :as rend]))
 
 (def ring-server (atom nil))
 
 (defn base-handler [ctx request]
-  {:status 200
-   :headers {"Content-Type" "text/plain"}
-   :body (pr-str request)})
+  (let [result (bar/fire-all ctx
+                             [:bailey.request/new :bailey.request/session :bailey.request/auth :bailey.request/parse
+                              :bailey.dispatch/pre-dispatch :bailey.dispatch/dispatch
+                              :bailey.render/pre-render :bailey.render/render :bailey.render/post-render]
+                             request)
+        status (:status result)
+        response (:data result)]
+    (if (= status :ok)
+      response
+      {:status 500
+       :headers {"Content-Type" "text/plain"}
+       :body "Internal server error"})))
 
 (defn start-server* [ctx]
   ;; should probably check here for running server in @ring-server, and do something
@@ -24,9 +33,9 @@
 (defn start-server [ctx]
   (try
     (let [ctx (start-server* ctx)]
-      (bar/fire ctx ::server-start))
+      (bar/fire ctx ::server-start {}))
     (catch Exception e
-      (bar/fire ctx {::exception e}))))
+      (bar/fire ctx ::server-failed-start {::exception e}))))
 
 (defn stop-server* [ctx]
   (when-let [server @ring-server]
@@ -96,7 +105,7 @@ and ::init events, and then start the server."})
           ;; else return whatever the failure status was
           result)))))
 
-(defn setup-handlers [ctx handler-setups]
+#_(defn setup-handlers [ctx handler-setups]
   (reduce (fn [c f] (f c)) ctx handler-setups))
 
 (defn setup
@@ -109,9 +118,7 @@ takes an optional list of standard Jetty configuration options, as keyword
                 (setup-events req/base-events)
                 (setup-events disp/base-events)
                 (setup-events rend/base-events)
-
-                (setup-handlers [setup-restart-handler
-                                 ]))
+                (setup-restart-handler))
         opts (apply hash-map opts)
         opts (merge default-options opts)
         opts (parse-opts opts)]

@@ -77,9 +77,15 @@ the `bailey.dispatch/handler` function, except with a mime type instead of an HT
 
 
 
-## Usage
+## TODO
 
-FIXME
+  - Add launch/shutdown events for starting/stopping by firing events from the REPL?
+  - Implement dispatch functions
+  - Implement render functions
+  - Start building libraries of basic handlers for session, auth, parse, etc
+      -- actually, the parse handler should be built-in, based on the incoming content type.
+  - Wrap base handler in a try/catch
+  - Start building foundational error-handling in base handler
 
 ## License
 

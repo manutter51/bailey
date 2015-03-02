@@ -1,4 +1,4 @@
-(ns bailey.req
+(ns bailey.request
   (require [barnum.api :as bar]))
 
 (def base-events
