@@ -5,17 +5,20 @@
     [midje.sweet :as m]))
 
 (m/fact "bailey.app/setup registers events for app initialization"
-        (let [ctx (app/setup)]
-          (bar/event-keys ctx))
-        => (m/contains
-             [:bailey.app/init :bailey.app/load-config  :bailey.app/server-failed-start
-              ::app/server-restart :bailey.app/server-start :bailey.app/server-stop
-              :bailey.req/new :bailey.req/auth :bailey.dispatch/dispatch :bailey.dispatch/dispatch-error
-              :bailey.dispatch/pre-dispatch :bailey.req/parse :bailey.req/parse-json
-              :bailey.req/parse-multipart :bailey.req/parse-xml :bailey.render/post-render
-              :bailey.render/pre-render :bailey.render/render :bailey.req/session
-              :bailey.req/session-store]
-             :in-any-order :gaps-ok))
+        (let [ctx (app/setup)
+              expected [:bailey.app/init :bailey.app/load-config  :bailey.app/server-failed-start
+                        :bailey.app/server-restart :bailey.app/server-start :bailey.app/server-stop :bailey.app/stop
+                        :bailey.request/new :bailey.request/auth :bailey.dispatch/dispatch :bailey.dispatch/dispatch-error
+                        :bailey.dispatch/pre-dispatch :bailey.request/parse :bailey.request/parse-json
+                        :bailey.request/parse-multipart :bailey.request/parse-xml :bailey.render/post-render
+                        :bailey.render/pre-render :bailey.render/render :bailey.request/session
+                        :bailey.request/session-store]
+              found (bar/event-keys ctx)]
+          ;(prn (sort found))
+          ;(println)
+          ;(prn (sort expected))
+          found
+          => (m/contains expected :in-any-order :gaps-ok)))
 
 (m/fact "Events have docstrings"
         (bar/docs (app/setup) :bailey.app/server-start)

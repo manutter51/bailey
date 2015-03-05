@@ -1,5 +1,6 @@
 (ns bailey.dispatch
-  (require [barnum.api :as bar]))
+  (require [clojure.string :as str]
+           [barnum.api :as bar]))
 
 (def base-events
   {::pre-dispatch
@@ -18,3 +19,29 @@ TODO: define how handling/routing works in Bailey!"
 request cannot be handled. The event data must contain two keys: :error-code
 and :error-message, corresponding to the HTTP error code and a user friendly
 error message."})
+
+(defn to-named-group [s]
+  (if (= \: (first s))
+    (str "([^/]+)")
+    s))
+
+(defn to-key [s]
+  (if (= \: (first s))
+    (keyword (apply str (rest s)))))
+
+(defn str->re [url]
+  (let [groups (str/split url #"/")
+        keyed (map to-named-group groups)
+        url (str/join "/" keyed)]
+    (re-pattern (str "^" url "$"))))
+
+(defn make-matcher [url]
+  (let [re (str->re url)
+        groups (str/split url #"/")
+        keys (filter identity (map to-key groups))]
+    (fn [live-url]
+      (let [matches (re-find re live-url)
+            url-match url
+            url-params (into {} (map (fn [a b] [a b]) keys (rest matches)))]
+        (if matches {:url-match  url-match
+                     :url-params url-params})))))

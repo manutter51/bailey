@@ -35,24 +35,30 @@ do this from the REPL, assuming you've set one up.
 There's one Bailey event in particular that you will need to write handlers for, and that's the `::dispatch`
 event. The `::dispatch` event is the event that fires when incoming request data has been pre-processed and
 it is now time to handle the actual request. The format of a `dispatch` handler is similar to Compojure URL
-routing, with some minor variations.  Here's an example.
+routing, with some minor variations.  Here's an example, using the `on` macro.
 
-    (bailey.dispatch/handle GET "/path/resource/:id" ctx data
+    (bailey.dispatch/on ctx :get "/path/resource/:id"
+      [ctx data]
       (let [row (db/get id)]
-        (barnum.results/ok (select-keys [:id :first_name :last_name] row))))
+        (barnum.results/return (select-keys [:id :first_name :last_name] row))))
 
-The `bailey.dispatch` namespace provides a special `handle` macro you can use to write dispatch handlers. The
-syntax is straightforward: `(bailey.dispatch/handle VERB url-pattern & body)`, where `VERB` is one of the
-standard HTTP verbs like GET and POST, `url-pattern` is a string corresponding to the URL you want this handler
-to respond to, `ctx` is the bailey "context" for the current request, `data` is the current request data (if any)
-and `body` is a list of one or more forms that implement the business logic for this particular handler. Your
-handler should use one of the `barnum.results` functions to return data from your handler along with a status
-marker indicating whether any errors occurred, whether to keep executing any additional handlers for the current
-event, or whether to jump to a new event.
+The `bailey.dispatch` namespace provides a special `on` macro you can use to write dispatch handlers. The
+syntax is straightforward: `(bailey.dispatch/on ctx VERB url-pattern args & body)`, where `ctx` is the context
+containing the event registry, `VERB` is a lowercase keyword named after one of the standard HTTP verbs, and
+`url-pattern` is a string corresponding to the URL you want this handler to respond to. These first three arguments
+are used to set up the routing so that each handler looks for a specific verb+URL pattern to handle and only applies
+its logic to requests that match.
 
-Use ANY as the HTTP verb to match any incoming HTTP verb (including DELETE).
+Next comes a vector of 2 arguments that the handler will receive when the ::dispatch event actually fires. By
+convention, these two arguments are named `ctx` and `data`. The `ctx` argument is the bailey "context" for the
+current request, and `data` is the current request data (if any). The `body` is a list of one or more forms that
+implement the business logic for this particular handler. Your handler must use one of the `barnum.results`
+functions to return data + status from your handler.
 
-The data you return should not include any raw HTML, and in fact any HTML in your data at this point should be
+Use :any as the HTTP verb to match any incoming HTTP verb (including DELETE), or use a collection of keywords
+to match a specific set of verbs.
+
+The data you return should not include any raw HTML, and in fact any HTML in your data at this point will be
 converted to HTML Entities to avoid client-side JS injection attacks. To convert your response to HTML, use
 a handler for the `render` event, described below.
 
