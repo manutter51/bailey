@@ -39,9 +39,30 @@ error message."})
   (let [re (str->re url)
         groups (str/split url #"/")
         keys (filter identity (map to-key groups))]
-    (fn [live-url]
-      (let [matches (re-find re live-url)
-            url-match url
-            url-params (into {} (map (fn [a b] [a b]) keys (rest matches)))]
-        (if matches {:url-match  url-match
-                     :url-params url-params})))))
+    `(fn [live-url#]
+      (let [matches# (re-find ~re live-url#)
+            url-match# ~url
+            url-params# (into {} (map (fn [a# b#] [a# b#]) ~keys (rest matches#)))]
+        (if matches# {:url-match  url-match#
+                     :url-params url-params#})))))
+
+(defn make-verb-matcher [verb]
+  (if (coll? verb)
+    (let [in-verbs? (into #{} verb)]
+      `(fn [v#] (~in-verbs? v#)))
+    `(fn [v#] (= v# ~verb))))
+
+(defmacro on [verb url fn-args & body]
+  (if-not (and (vector? fn-args) (= 2 (count fn-args)))
+    (throw (Exception. "Third argument to bailey.dispatch/on must be a vector containint two symbols.")))
+  (let [[ctx-sym data-sym] fn-args
+        matcher (bailey.dispatch/make-matcher url)
+        verb-matcher (bailey.dispatch/make-verb-matcher verb)]
+    `(fn [~ctx-sym ~data-sym]
+       (if-not (~verb-matcher (:request-method ~data-sym))
+         (barnum.api/return ~data-sym)
+         (let [match-data# (~matcher (:uri ~data-sym))
+               ~data-sym (merge ~data-sym match-data#)]
+           (if (nil? match-data#)
+             (barnum.api/ok ~data-sym)
+             (do ~@body)))))))

@@ -32,3 +32,9 @@
 
           (matcher "/profile/17/other")
           => nil))
+
+(m/fact "dispatch/on creates a dispatch event handler"
+        (macroexpand-1 '(dispatch/on :get "/home"
+                                     [ctx data]
+                                     ({:body "Hello, world."})))
+        => '(fn [ctx data] "Hello, world"))

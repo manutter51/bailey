@@ -37,17 +37,16 @@ event. The `::dispatch` event is the event that fires when incoming request data
 it is now time to handle the actual request. The format of a `dispatch` handler is similar to Compojure URL
 routing, with some minor variations.  Here's an example, using the `on` macro.
 
-    (bailey.dispatch/on ctx :get "/path/resource/:id"
+    (bailey.dispatch/on :get "/path/resource/:id"
       [ctx data]
       (let [row (db/get id)]
         (barnum.results/return (select-keys [:id :first_name :last_name] row))))
 
 The `bailey.dispatch` namespace provides a special `on` macro you can use to write dispatch handlers. The
-syntax is straightforward: `(bailey.dispatch/on ctx VERB url-pattern args & body)`, where `ctx` is the context
-containing the event registry, `VERB` is a lowercase keyword named after one of the standard HTTP verbs, and
-`url-pattern` is a string corresponding to the URL you want this handler to respond to. These first three arguments
-are used to set up the routing so that each handler looks for a specific verb+URL pattern to handle and only applies
-its logic to requests that match.
+syntax is straightforward: `(bailey.dispatch/on VERB url-pattern args & body)`, where `VERB` is a lowercase keyword
+named after one of the standard HTTP verbs, and `url-pattern` is a string corresponding to the URL you want this
+handler to respond to. These first two arguments are used to set up the routing so that each handler looks for a
+specific verb+URL pattern to handle and only applies its logic to requests that match.
 
 Next comes a vector of 2 arguments that the handler will receive when the ::dispatch event actually fires. By
 convention, these two arguments are named `ctx` and `data`. The `ctx` argument is the bailey "context" for the
@@ -99,3 +98,31 @@ Copyright © 2015 Mark Nutter
 
 Distributed under the Eclipse Public License either version 1.0 or (at
 your option) any later version.
+
+
+
+## NOTES
+
+Sample request map:
+
+    {:ssl-client-cert nil,
+     :remote-addr "127.0.0.1",
+     :headers
+     {"accept-encoding" "gzip, deflate",
+      "user-agent"
+      "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:36.0) Gecko/20100101 Firefox/36.0",
+      "connection" "keep-alive",
+      "accept-language" "en-US,en;q=0.5",
+      "accept"
+      "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "host" "localhost:8088"},
+     :server-port 8088,
+     :content-length nil,
+     :content-type nil,
+     :character-encoding nil,
+     :uri "/Test",
+     :server-name "localhost",
+     :query-string "foo=bar",
+     :body #<HttpInput org.eclipse.jetty.server.HttpInput@40a57174>,
+     :scheme :http,
+     :request-method :get}
