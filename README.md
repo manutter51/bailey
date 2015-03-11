@@ -103,6 +103,8 @@ your option) any later version.
 
 ## NOTES
 
+Fix unit tests by making make-matcher into a macro?
+
 Sample request map:
 
     {:ssl-client-cert nil,
