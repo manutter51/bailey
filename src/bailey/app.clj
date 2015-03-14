@@ -23,7 +23,7 @@
 
 (defn start-server* [ctx]
   ;; should probably check here for running server in @ring-server, and do something
-  (let [opts (::server-options ctx)
+  (let [opts (:server-options ctx)
         handler (fn [request]
                   (base-handler ctx request))]
     (reset! ring-server
@@ -33,9 +33,9 @@
 (defn start-server [ctx]
   (try
     (let [ctx (start-server* ctx)]
-      (bar/fire ctx ::server-start {}))
+      (bar/fire ctx :server-start {}))
     (catch Exception e
-      (bar/fire ctx ::server-failed-start {::exception e}))))
+      (bar/fire ctx :server-failed-start {:exception e}))))
 
 (defn stop-server* [ctx]
   (when-let [server @ring-server]
@@ -60,27 +60,27 @@
     opts))
 
 (def base-events
-  {::load-config
+  {:load-config
    "Fires just before :bailey.app/init, to let you load any
 application-specific configuration files."
-   ::init
+   :init
    "Fires after :bailey.app/load-config and before launching the
 server, to let you connect to any database servers, caches, or other
 dependencies."
-   ::server-start
+   :server-start
    "Fires after the server successfully starts. Intended for debugging/logging."
-   ::server-failed-start
+   :server-failed-start
    "Fires if the server fails to start for any reason."
-   ::server-stop
+   :server-stop
    "Fires after the server is stopped. Intended for debugging/logging."
-   ::stop
-   "Fired after the server stops and after the ::server-stop event, to let
+   :stop
+   "Fired after the server stops and after the :server-stop event, to let
 you shut down database connections or other resources that require some kind
 of cleanup on shutdown."
-   ::server-restart
+   :server-restart
    "Fire this event to trigger a server restart. Default handler action
-is to stop the server and then fire the ::server-stop, ::stop, ::load-config,
-and ::init events, and then start the server."})
+is to stop the server and then fire the :server-stop, :stop, :load-config,
+and :init events, and then start the server."})
 
 (defn setup-events [ctx events-map]
   (loop [[event docstring] (first events-map)
@@ -92,10 +92,10 @@ and ::init events, and then start the server."})
 
 (defn setup-restart-handler [ctx]
   (bar/add-handler
-    ctx ::server-restart ::default-restart-handler
+    ctx :server-restart :default-restart-handler
     (fn [ctx data]
       (let [ctx (stop-server* ctx)
-            result (barnum.api/fire-all ctx [::server-stop ::stop ::load-config ::init] data)
+            result (barnum.api/fire-all ctx [:server-stop :stop :load-config :init] data)
             status (:barnum.api/status result)
             ctx (:barnum.api/context result)
             data (:barnum.api/data result)]
@@ -122,4 +122,4 @@ takes an optional list of standard Jetty configuration options, as keyword
         opts (apply hash-map opts)
         opts (merge default-options opts)
         opts (parse-opts opts)]
-    (assoc ctx ::server-options opts)))
+    (assoc ctx :server-options opts)))

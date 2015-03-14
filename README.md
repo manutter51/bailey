@@ -32,8 +32,8 @@ do this from the REPL, assuming you've set one up.
 
 ## Dispatch
 
-There's one Bailey event in particular that you will need to write handlers for, and that's the `::dispatch`
-event. The `::dispatch` event is the event that fires when incoming request data has been pre-processed and
+There's one Bailey event in particular that you will need to write handlers for, and that's the `:dispatch`
+event. The `:dispatch` event is the event that fires when incoming request data has been pre-processed and
 it is now time to handle the actual request. The format of a `dispatch` handler is similar to Compojure URL
 routing, with some minor variations.  Here's an example, using the `on` macro.
 
@@ -48,7 +48,7 @@ named after one of the standard HTTP verbs, and `url-pattern` is a string corres
 handler to respond to. These first two arguments are used to set up the routing so that each handler looks for a
 specific verb+URL pattern to handle and only applies its logic to requests that match.
 
-Next comes a vector of 2 arguments that the handler will receive when the ::dispatch event actually fires. By
+Next comes a vector of 2 arguments that the handler will receive when the `:dispatch` event actually fires. By
 convention, these two arguments are named `ctx` and `data`. The `ctx` argument is the bailey "context" for the
 current request, and `data` is the current request data (if any). The `body` is a list of one or more forms that
 implement the business logic for this particular handler. Your handler must use one of the `barnum.results`
@@ -68,9 +68,9 @@ lost as soon as your handler returns. To modify the current state of your applic
 
 ## Render
 
-The second primary event your application will want to handle is the `::render` event. The default rendering action
+The second primary event your application will want to handle is the `:render` event. The default rendering action
 is to return the data map as a JSON string. To return data in any other format, such as edn, HTML, or XML, attach a
-handler for it on the `::render` event. The `bailey.render/handle` macro sets up a render handler for you much like
+handler for it on the `:render` event. The `bailey.render/handle` macro sets up a render handler for you much like
 the `bailey.dispatch/handler` function, except with a mime type instead of an HTTP verb.
 
     (bailey.render/handle "text/html" "/path/resource/:id" ctx data
