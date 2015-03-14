@@ -9,7 +9,7 @@
               expected [:init :load-config  :server-failed-start
                         :server-restart :server-start :server-stop :stop
                         :new :auth :dispatch :dispatch-error
-                        :pre-dispatch :parse :parse-json
+                        :pre-dispatch :parse :parse-json :parse-query-string
                         :parse-multipart :parse-xml :post-render
                         :pre-render :render :session
                         :session-store]
@@ -49,7 +49,7 @@
                    ctx (bar/add-handler ctx :load-config :load-handler (mock :load))
                    ctx (bar/add-handler ctx :init :init-handler (mock :init))
                    ctx (bar/add-handler ctx :server-start :start-handler (mock :start))
-                   ctx (app/start-server ctx)
+                   ctx (app/start ctx)
                    _ (reset! coll [])
                    result (bar/fire ctx :server-restart {})
                    results-vec @coll

@@ -9,9 +9,9 @@
 
 (defn base-handler [ctx request]
   (let [result (bar/fire-all ctx
-                             [:bailey.request/new :bailey.request/session :bailey.request/auth :bailey.request/parse
-                              :bailey.dispatch/pre-dispatch :bailey.dispatch/dispatch
-                              :bailey.render/pre-render :bailey.render/render :bailey.render/post-render]
+                             [:new :session :auth :parse
+                              :pre-dispatch :dispatch
+                              :pre-render :render :post-render]
                              request)
         status (:status result)
         response (:data result)]
@@ -30,18 +30,24 @@
             (jetty/run-jetty handler opts))
     ctx))
 
-(defn start-server [ctx]
+(defn start [ctx]
   (try
-    (let [ctx (start-server* ctx)]
-      (bar/fire ctx :server-start {}))
+    (let [ctx (start-server* ctx)
+          result (bar/fire ctx :server-start {})]
+      (:status result))
     (catch Exception e
-      (bar/fire ctx :server-failed-start {:exception e}))))
+      (let [result (bar/fire ctx :server-failed-start {:exception e})]
+        (:status result)))))
 
 (defn stop-server* [ctx]
   (when-let [server @ring-server]
     (.stop server)
     (reset! ring-server nil))
   ctx)
+
+(defn stop [ctx]
+  (let [ctx (stop-server* ctx)]
+    (bar/fire-all ctx [:server-stop :stop])))
 
 (def valid-options
   #{:configurator :port :host :join? :daemon? :ssl? :ssl-port :keystore :key-password
@@ -123,3 +129,4 @@ takes an optional list of standard Jetty configuration options, as keyword
         opts (merge default-options opts)
         opts (parse-opts opts)]
     (assoc ctx :server-options opts)))
+

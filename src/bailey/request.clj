@@ -1,5 +1,6 @@
 (ns bailey.request
-  (require [barnum.api :as bar]))
+  (require [barnum.api :as bar])
+  (import [java.net URLDecoder]))
 
 (def base-events
   {:new
@@ -22,6 +23,12 @@
  be done. The default handler checks the content type for
  xml, json, or multipart form data, and fires the :parse-xml,
  :parse-json, or :parse-multipart events as appropriate."
+   :parse-query-string
+   "The :parse-query-string event is fired by the default :parse event
+handler whenever the incoming request contains a non-empty
+query string. The default operation is for the handler to add
+a :query-params map to the request data, containing the URL-decoded
+keys and values parsed from the query string."
    :parse-xml
    "The :parse-xml event is fired by the default :parse event
 handler whenever the incoming request contains XML data. The
@@ -46,3 +53,27 @@ the contents of the corresponding multipart form."
    "The :session-store event is fired after dispatch processing is complete,
 to allow your application to save any session data you might want to persist
 between requests."})
+
+(defn string-to-pair [s & [encoding]]
+  (let [encoding (if encoding encoding "UTF-8")
+        pair (clojure.string/split s #"=")
+        k (URLDecoder/decode (first pair) encoding)
+        v (URLDecoder/decode (second pair) encoding)
+        v (if (re-matches #"^.*\[\]$" k) [v] v)
+        k (clojure.string/replace k #"[^A-Za-z0-9_*-]" "")]
+    {(keyword k) v}))
+
+(defn combine [a b]
+  (cond
+    (and (coll? a) (coll? b)) (vec (concat a b))
+    (coll? a) (conj a b)
+    (coll? b) (vec (conj (seq b) a))
+    :else [a b]))
+
+(defn parse-query-string [data]
+  (if-let [query-string (:query-string data)]
+    (let [pairs (clojure.string/split query-string #"\&")
+          query-params (apply merge-with combine {} (map string-to-pair pairs))]
+      (assoc data :query-params query-params))
+    ; else
+    data))
