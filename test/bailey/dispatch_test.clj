@@ -129,3 +129,72 @@
 
           (handler ctx match-verb-not-uri)
           => {:status :ok :data (with-url-mismatch match-verb-not-uri)}))
+
+(m/fact "dispatch/on creates a dispatch event handler that handles get/post correctly"
+        (let [handler (dispatch/on [:get :post] "/signup"
+                                   [ctx data]
+                                   (bar/return {:body "Signed up"}))
+              ctx {}
+              match-verb-and-url-1 (mock/request :get "/signup")
+              match-verb-and-url-2 (mock/request :post "/signup")
+              match-url-not-verb (mock/request :delete "/signup")
+              match-verb-not-url-1 (mock/request :get "/logout")
+              match-verb-not-url-2 (mock/request :post "/logout")
+              match-neither (mock/request :put "/update")]
+
+          (handler ctx match-verb-and-url-1)
+          => {:status :ok-return :data {:body "Signed up"}}
+
+          (handler ctx match-verb-and-url-2)
+          => {:status :ok-return :data {:body "Signed up"}}
+
+          (handler ctx match-url-not-verb)
+          => {:status :ok :data (with-verb-mismatch match-url-not-verb)}
+
+          (handler ctx match-verb-not-url-1)
+          => {:status :ok :data (with-url-mismatch match-verb-not-url-1)}
+
+          (handler ctx match-verb-not-url-2)
+          => {:status :ok :data (with-url-mismatch match-verb-not-url-2)}
+
+          (handler ctx match-neither)
+          => {:status :ok :data (with-verb-mismatch match-neither)}))
+
+(m/fact "dispatch/on creates a dispatch event handler that handles verb lists correctly"
+        (let [handler (dispatch/on [:get :post :put] "/signup"
+                                   [ctx data]
+                                   (bar/return {:body "Signed up"}))
+              ctx {}
+              match-verb-and-url-1 (mock/request :get "/signup")
+              match-verb-and-url-2 (mock/request :post "/signup")
+              match-verb-and-url-3 (mock/request :put "/signup")
+              match-url-not-verb (mock/request :delete "/signup")
+              match-verb-not-url-1 (mock/request :get "/logout")
+              match-verb-not-url-2 (mock/request :post "/logout")
+              match-verb-not-url-3 (mock/request :put "/logout")
+              match-neither (mock/request :delete "/update")]
+
+          (handler ctx match-verb-and-url-1)
+          => {:status :ok-return :data {:body "Signed up"}}
+
+          (handler ctx match-verb-and-url-2)
+          => {:status :ok-return :data {:body "Signed up"}}
+
+          (handler ctx match-verb-and-url-3)
+          => {:status :ok-return :data {:body "Signed up"}}
+
+          (handler ctx match-url-not-verb)
+          => {:status :ok :data (with-verb-mismatch match-url-not-verb)}
+
+          (handler ctx match-verb-not-url-1)
+          => {:status :ok :data (with-url-mismatch match-verb-not-url-1)}
+
+          (handler ctx match-verb-not-url-2)
+          => {:status :ok :data (with-url-mismatch match-verb-not-url-2)}
+
+          (handler ctx match-verb-not-url-3)
+          => {:status :ok :data (with-url-mismatch match-verb-not-url-3)}
+
+          (handler ctx match-neither)
+          => {:status :ok :data (with-verb-mismatch match-neither)}))
+

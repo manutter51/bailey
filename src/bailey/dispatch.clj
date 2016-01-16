@@ -25,7 +25,6 @@ error message."})
   true)
 
 (defn match-one [k req]
-  (prn "match one " k req (if (= k (:request-method req)) "MATCH" "No match"))
   (= k (:request-method req)))
 
 (defn match-get [req]
@@ -35,7 +34,7 @@ error message."})
   (match-one :post req))
 
 (defn match-get-or-post [req]
-  (#{:get :post} (:request-method req)))
+  (not= nil (#{:get :post} (:request-method req))))
 
 (defn match-put [req]
   (match-one :put req))
@@ -60,10 +59,10 @@ error message."})
     :options match-options
     [:get :post] match-get-or-post
     [:post :get] match-get-or-post
-    (let [verb-set (into #{} (if (seq? verb) verb [verb]))]
+    (let [verb-set (into #{} (if (coll? verb) verb [verb]))]
       (fn [req]
         (let [meth (:request-method req)]
-          (verb-set meth))))))
+          (not= nil (verb-set meth)))))))
 
 (defmacro on
   "Builds a Bailey-compatible dispatch event handler, given a request method,
