@@ -2,145 +2,124 @@
   (require
     [bailey.dispatch :as dispatch]
     [barnum.api :as bar]
+    [ring.mock.request :as mock]
     [midje.sweet :as m]))
 
-(m/fact "dispatch/str->re returns a valid regex for plain url"
-        (dispatch/str->re "/home")
-        => #"^/home$")
+(defn with-url-mismatch [data]
+  (assoc data :last-match-fail "URL mismatch"))
 
-(m/fact "urls that include keywords return a matcher that matches the keyword"
-        (dispatch/str->re "/profile/:id")
-        => #"^/profile/([^/]+)$")
+(defn with-verb-mismatch [data]
+  (assoc data :last-match-fail "Verb mismatch"))
 
 (m/fact "verb-matcher works for individual verbs"
         (let [f (dispatch/make-verb-matcher :get)]
-          (f :get)
-          => true
+          (f (mock/request :get "/"))
+          => m/truthy
 
-          (f :post)
-          => false))
+          (f (mock/request :post "/"))
+          => m/falsey))
 
 (m/fact "verb-matcher works for multiple verbs"
         (let [f (dispatch/make-verb-matcher [:get :post])]
-          (f :get)
-          => true
+          (f (mock/request :get "/"))
+          => m/truthy
 
-          (f :post)
-          => true
+          (f (mock/request :post "/"))
+          => m/truthy
 
-          (f :put)
-          => false))
+          (f (mock/request :put "/"))
+          => m/falsey))
 
 (m/fact "verb-matcher works for :any"
         (let [f (dispatch/make-verb-matcher :any)]
-          (f :get)
-          => true
+          (f (mock/request :get "/"))
+          => m/truthy
 
-          (f :post)
-          => true
+          (f (mock/request :post "/"))
+          => m/truthy
 
-          (f :put)
-          => true
+          (f (mock/request :put "/"))
+          => m/truthy
 
-          (f :delete)
-          => true
+          (f (mock/request :delete "/"))
+          => m/truthy
 
-          (f :options)
-          => true
+          (f (mock/request :options "/"))
+          => m/truthy
 
-          (f :head)
-          => true))
-
-(m/fact "dispatch/make-matcher returns a fn that matches plain urls"
-        (let [matcher (dispatch/make-matcher "/home")]
-
-          (matcher "/home")
-          => {:url-match "/home" :url-params {}}
-
-          (matcher "/foo")
-          => nil))
-
-(m/fact "dispatch/make-matcher returns a fn that matches parameterized urls"
-        (let [matcher (dispatch/make-matcher "/profile/:id")]
-
-          (matcher "/profile/17")
-          => {:url-match "/profile/:id" :url-params {:id "17"}}
-
-          (matcher "/profile/other/17")
-          => nil
-
-          (matcher "/profile/17/other")
-          => nil ))
+          (f (mock/request :head "/"))
+          => m/truthy))
 
 (m/fact "dispatch/on creates a dispatch event handler that handles URLs properly"
         (let [handler (dispatch/on :get "/home"
                                    [ctx data]
                                    (bar/return {:body "Hello, world."}))
               ctx {}
-              match-verb-and-url {:request-method :get :uri "/home"}
-              match-url-not-verb {:request-method :post :uri "/home"}
-              match-verb-not-uri {:request-method :get :uri "/login"}]
+              match-verb-and-url (mock/request :get "/home")
+              match-url-not-verb (mock/request :post "/home")
+              match-verb-not-uri (mock/request :get "/login")]
 
           (handler ctx match-verb-and-url)
           => {:status :ok-return :data {:body "Hello, world."}}
 
           (handler ctx match-url-not-verb)
-          => {:status :ok :data match-url-not-verb}
+          => {:status :ok :data (with-verb-mismatch match-url-not-verb)}
 
           (handler ctx match-verb-not-uri)
-          => {:status :ok :data match-verb-not-uri}))
+          => {:status :ok :data (with-url-mismatch match-verb-not-uri)})
 
-(m/fact "dispatch/on creates a dispatch event handler that handles params properly"
-        (let [handler (dispatch/on :get "/resource/:id/subresource/:type"
-                                   [ctx data]
-                                   (let [params (:url-params data)]
-                                     (bar/return {:body (str "Resource " (:id params) " has subresource " (:type params) ".")})))
-              ctx {}
-              match-verb-and-url {:request-method :get :uri "/resource/foo/subresource/bar"}
-              match-url-not-verb {:request-method :post :uri "/resource/foo/subresource/bar"}
-              match-verb-not-uri-1 {:request-method :get :uri "/resource/foo/subresource"}
-              match-verb-not-uri-2 {:request-method :get :uri "/resource/foo"}
-              match-verb-not-uri-3 {:request-method :get :uri "/resource/foo/subresource/bar/"}
-              match-verb-not-uri-4 {:request-method :get :uri "/resource/foo/subresource/"}
-              match-verb-not-uri-5 {:request-method :get :uri "/resource/foo/"}
-              match-verb-not-uri-6 {:request-method :get :uri "/resource/"}
-              match-verb-not-uri-7 {:request-method :get :uri "/resource"}]
+        (m/fact "dispatch/on creates a dispatch event handler that handles params properly"
+                (let [handler (dispatch/on :get "/resource/:id/subresource/:type"
+                                           [ctx data]
+                                           (let [params (:url-params data)]
+                                             (bar/return {:body (str "Resource " (:id params) " has subresource " (:type params) ".")})))
+                      ctx {}
+                      match-verb-and-url (mock/request :get "/resource/foo/subresource/bar")
+                      match-url-not-verb (mock/request :post "/resource/foo/subresource/bar")
+                      match-verb-not-uri-1 (mock/request :get "/resource/foo/subresource")
+                      match-verb-not-uri-2 (mock/request :get "/resource/foo")
+                      match-verb-not-uri-3 (mock/request :get "/resource/foo/subresource/bar/")
+                      match-verb-not-uri-4 (mock/request :get "/resource/foo/subresource/")
+                      match-verb-not-uri-5 (mock/request :get "/resource/foo/")
+                      match-verb-not-uri-6 (mock/request :get "/resource/")
+                      match-verb-not-uri-7 (mock/request :get "/resource")]
 
-          (handler ctx match-verb-and-url)
-          => {:status :ok-return :data {:body "Resource foo has subresource bar."}}
+                  (handler ctx match-verb-and-url)
+                  => {:status :ok-return :data {:body "Resource foo has subresource bar."}}
 
-          (handler ctx match-url-not-verb)
-          => {:status :ok :data match-url-not-verb}
+                  (handler ctx match-url-not-verb)
+                  => {:status :ok :data (with-verb-mismatch match-url-not-verb)}
 
-          (handler ctx match-verb-not-uri-1)
-          => {:status :ok :data match-verb-not-uri-1}
+                  (handler ctx match-verb-not-uri-1)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-1)}
 
-          (handler ctx match-verb-not-uri-2)
-          => {:status :ok :data match-verb-not-uri-2}
+                  (handler ctx match-verb-not-uri-2)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-2)}
 
-          (handler ctx match-verb-not-uri-3)
-          => {:status :ok :data match-verb-not-uri-3}
+                  (handler ctx match-verb-not-uri-3)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-3)}
 
-          (handler ctx match-verb-not-uri-4)
-          => {:status :ok :data match-verb-not-uri-4}
+                  (handler ctx match-verb-not-uri-4)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-4)}
 
-          (handler ctx match-verb-not-uri-5)
-          => {:status :ok :data match-verb-not-uri-5}
+                  (handler ctx match-verb-not-uri-5)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-5)}
 
-          (handler ctx match-verb-not-uri-6)
-          => {:status :ok :data match-verb-not-uri-6}
+                  (handler ctx match-verb-not-uri-6)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-6)}
 
-          (handler ctx match-verb-not-uri-7)
-          => {:status :ok :data match-verb-not-uri-7}))
+                  (handler ctx match-verb-not-uri-7)
+                  => {:status :ok :data (with-url-mismatch match-verb-not-uri-7)})))
 
 (m/fact "dispatch/on creates a dispatch event handler that handles :any verb properly"
         (let [handler (dispatch/on :any "/home"
                                    [ctx data]
                                    (bar/return {:body "Hello, world."}))
               ctx {}
-              match-verb-and-url {:request-method :get :uri "/home"}
-              match-url-not-verb {:request-method :post :uri "/home"}
-              match-verb-not-uri {:request-method :get :uri "/login"}]
+              match-verb-and-url (mock/request :get "/home")
+              match-url-not-verb (mock/request :post "/home")
+              match-verb-not-uri (mock/request :get "/login")
+              ]
 
           (handler ctx match-verb-and-url)
           => {:status :ok-return :data {:body "Hello, world."}}
@@ -149,4 +128,4 @@
           => {:status :ok-return :data {:body "Hello, world."}}
 
           (handler ctx match-verb-not-uri)
-          => {:status :ok :data match-verb-not-uri}))
+          => {:status :ok :data (with-url-mismatch match-verb-not-uri)}))

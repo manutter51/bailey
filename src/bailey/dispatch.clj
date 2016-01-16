@@ -21,13 +21,49 @@ request cannot be handled. The event data must contain two keys: :error-code
 and :error-message, corresponding to the HTTP error code and a user friendly
 error message."})
 
-(defmacro make-verb-matcher [verb]
-  (if (= :any verb)
-    `(fn [ignored#] true)
-    (if (coll? verb)
-      (let [in-verbs? (into #{} verb)]
-        `(fn [v#] (not= nil (~in-verbs? v#))))
-      `(fn [v#] (= v# ~verb)))))
+(defn match-any [_]
+  true)
+
+(defn match-one [k req]
+  (prn "match one " k req (if (= k (:request-method req)) "MATCH" "No match"))
+  (= k (:request-method req)))
+
+(defn match-get [req]
+  (match-one :get req))
+
+(defn match-post [req]
+  (match-one :post req))
+
+(defn match-get-or-post [req]
+  (#{:get :post} (:request-method req)))
+
+(defn match-put [req]
+  (match-one :put req))
+
+(defn match-delete [req]
+  (match-one :delete req))
+
+(defn match-head [req]
+  (match-one :head req))
+
+(defn match-options [req]
+  (match-one :options req))
+
+(defn make-verb-matcher [verb]
+  (condp = verb
+    :any match-any
+    :get match-get
+    :post match-post
+    :put match-put
+    :delete match-delete
+    :head match-head
+    :options match-options
+    [:get :post] match-get-or-post
+    [:post :get] match-get-or-post
+    (let [verb-set (into #{} (if (seq? verb) verb [verb]))]
+      (fn [req]
+        (let [meth (:request-method req)]
+          (verb-set meth))))))
 
 (defmacro on
   "Builds a Bailey-compatible dispatch event handler, given a request method,
@@ -56,10 +92,10 @@ error message."})
               route-matcher# ~clout-compiler]
           ; got our closures set up, now return the handler fn
           (fn [~ctx ~data]
-            (if-not (verb-matcher# (:request-method ~data))
+            (if-not (verb-matcher# ~data)
               (bar/ok (assoc ~data :last-match-fail "Verb mismatch"))
               (let [params# (clout/route-matches route-matcher# ~data)]
                 (if (nil? params#)
                   (bar/ok (assoc ~data :last-match-fail "URL mismatch"))
-                  (let [~data (assoc ~data :match-uri ~url :uri-params params#)]
+                  (let [~data (assoc ~data :match-uri ~url :url-params params#)]
                     ~@body))))))))))
