@@ -1,5 +1,6 @@
 (ns bailey.dispatch
   (require [clojure.string :as str]
+           [clout.core :as clout]
            [barnum.api :as bar]))
 
 (def base-events
@@ -20,31 +21,6 @@ request cannot be handled. The event data must contain two keys: :error-code
 and :error-message, corresponding to the HTTP error code and a user friendly
 error message."})
 
-(defn to-named-group [s]
-  (if (= \: (first s))
-    (str "([^/]+)")
-    s))
-
-(defn to-key [s]
-  (if (= \: (first s))
-    (keyword (apply str (rest s)))))
-
-(defn str->re [url]
-  (let [groups (str/split url #"/")
-        keyed (map to-named-group groups)
-        url (str/join "/" keyed)]
-    (re-pattern (str "^" url "$"))))
-
-(defmacro make-matcher [url]
-  (let [re (str->re url)
-        groups (str/split url #"/")
-        keys (filter identity (map to-key groups))]
-    `(fn [live-url#]
-      (let [matches# (re-find ~re live-url#)
-            url-params# (into {} (map (fn [a# b#] [a# b#]) [~@keys] (rest matches#)))]
-        (if matches# {:url-match  ~url
-                     :url-params url-params#})))))
-
 (defmacro make-verb-matcher [verb]
   (if (= :any verb)
     `(fn [ignored#] true)
@@ -53,17 +29,37 @@ error message."})
         `(fn [v#] (not= nil (~in-verbs? v#))))
       `(fn [v#] (= v# ~verb)))))
 
-(defmacro on [verb url fn-args & body]
-  (if (zero? (count body))
-    (throw (Exception. "Body must contain at least one form.")))
-  (if-not (and (vector? fn-args) (= 2 (count fn-args)))
-    (throw (Exception. "Third argument to bailey.dispatch/on must be a vector containing two symbols.")))
-  (let [[ctx-sym data-sym] fn-args]
-    `(fn [~ctx-sym ~data-sym]
-       (if-not ((make-verb-matcher ~verb) (:request-method ~data-sym))
-         (barnum.api/ok ~data-sym)
-         (let [match-data# ((make-matcher ~url) (:uri ~data-sym))
-               ~data-sym (merge ~data-sym match-data#)]
-           (if (nil? match-data#)
-             (barnum.api/ok ~data-sym)
-             (do ~@body)))))))
+(defmacro on
+  "Builds a Bailey-compatible dispatch event handler, given a request method,
+  a URL string, optional Clout-style options map, a 2-element vector of
+  function arguments, and the handler body."
+  [verb url clout-options? fn-args? & body?]
+  (let [has-clout-options? (map? clout-options?)
+        clout-options (if has-clout-options? clout-options? nil)
+        clout-compiler (if has-clout-options? `(clout/route-compile ~url ~clout-options)
+                                              `(clout/route-compile ~url))
+        fn-args (if has-clout-options? fn-args? clout-options?)
+        [ctx data] fn-args
+        invalid-args-msg (if has-clout-options? "Expected a vector of 2 fn args [ctx data] after clout options map"
+                                                "Expected a vector of 2 fn args [ctx data] after url")
+        body (if has-clout-options? body? (conj body? fn-args?))]
+    ; Quick validity checks
+    (if-not (string? url)
+      (throw (IllegalArgumentException. "URL must be a string")))
+    (if-not (and (vector? fn-args) (= 2 (count fn-args)))
+      (throw (IllegalArgumentException. invalid-args-msg)))
+    (if (zero? (count body))
+      (throw (IllegalArgumentException. "Body must contain at least one form")))
+    ; wrap the fn we want inside another immediate-execute fn so we can get a one-time let binding
+    `((fn []
+        (let [verb-matcher# (make-verb-matcher ~verb)
+              route-matcher# ~clout-compiler]
+          ; got our closures set up, now return the handler fn
+          (fn [~ctx ~data]
+            (if-not (verb-matcher# (:request-method ~data))
+              (bar/ok (assoc ~data :last-match-fail "Verb mismatch"))
+              (let [params# (clout/route-matches route-matcher# ~data)]
+                (if (nil? params#)
+                  (bar/ok (assoc ~data :last-match-fail "URL mismatch"))
+                  (let [~data (assoc ~data :match-uri ~url :uri-params params#)]
+                    ~@body))))))))))
